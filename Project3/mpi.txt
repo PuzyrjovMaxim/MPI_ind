@@ -1,0 +1,87 @@
+#include <mpi.h>
+#include <stdio.h>
+#include <iostream>
+#include <string>
+#include <stdlib.h>
+#include <fstream>
+#include <vector>
+
+
+using namespace std;
+
+const string way = "C:\\mpi\\Project3\\x64\\Debug\\";
+
+int count_pos(vector<int> vec) {
+	int counter = 0;
+	for (int i = 0; i < vec.size(); i++) {
+		if (vec[i] > 0) {
+			counter++;
+		}
+	}
+	return counter;
+}
+
+vector<int> read_file(string filename) {
+	vector<int> vec;
+	ifstream fin;
+	fin.open(way + filename);
+
+	if (!fin) {
+		cerr << "This file can't be open" << "\n";
+		exit(1);
+	}
+
+	while (fin) {
+		string str;
+		getline(fin, str);
+		int num = atoi(str.c_str());
+		vec.push_back(num);
+	}
+
+	return vec;
+}
+
+int main(int argc, char* argv[])
+{
+	int rank, numtasks;
+	string filenames[5] = { "f1.txt", "f2.txt", "f3.txt", "f4.txt", "f5.txt" };
+	int total_count = 0;
+	MPI_Status status;
+
+	MPI_Init(&argc, &argv);
+	
+	MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	int* x = new int[numtasks];
+	if (rank == 0) {
+		for (int i = 0; i < numtasks; i++) {
+			x[i] = i;
+		}
+	}
+	MPI_Bcast(x, numtasks, MPI_CHAR, 0, MPI_COMM_WORLD);
+
+
+	string filename = filenames[rank];
+	vector<int> vec = read_file(filename);
+	int cnt_pos = count_pos(vec);
+
+	cout << "thread " << rank << " positive count: " << cnt_pos << "\n";
+
+	if (rank == 0) {
+		total_count = cnt_pos;
+		for (int i = 1; i < numtasks; i++) {
+			MPI_Recv(&cnt_pos, 1, MPI_INT, i, 0, MPI_COMM_WORLD, &status);
+			total_count += cnt_pos;
+		}
+	}
+	else {
+		MPI_Send(&cnt_pos, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
+	}
+	MPI_Finalize();
+	
+	ofstream fout;
+	fout.open(way + "file.txt");
+	fout << "Всего положительных чисел: " << total_count;
+	fout.close();
+	return 0;
+}
